@@ -71,7 +71,7 @@ void main() async {
 
   Level logLevel =
       Settings.logLevels.firstWhereOrNull(
-        (level) => level.levelName == preferences.getString(PrefKeys.logLevel),
+        (level) => level.levelName == preferences.getString(PrefKeys.logLevel), 
       ) ??
       Defaults.logLevel;
   Logger.level = logLevel;
