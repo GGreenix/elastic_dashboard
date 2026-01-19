@@ -127,7 +127,11 @@ class _NinjasTimebarContentState extends State<_NinjasTimebarContent>
   static const List<int> segmentEnds = [20, 45, 70, 95, 120, 160];
   static const double blinkThreshold = 3.0; // Start blinking 3 seconds before end
   static const double endGameBlinkThreshold = 10.0; // Start blinking 3 seconds before end
-
+  static const Color autonColor = Colors.yellow;
+  static const Color endgameColor = Colors.pinkAccent;
+  static const Color activeColor = Colors.green;
+  static const Color inactiveColor = Colors.grey;
+  
   @override
   void initState() {
     super.initState();
@@ -160,30 +164,30 @@ class _NinjasTimebarContentState extends State<_NinjasTimebarContent>
 
   Color _getSegmentColor(int index, bool isAutoWon) {
     // Segment 1 (index 0): Yellow
-    if (index == 0) return Colors.yellow;
+    if (index == 0) return autonColor;
     // Segment 6 (index 5): Magenta
-    if (index == 5) return Colors.pinkAccent;
+    if (index == 5) return endgameColor;
     // Segments 2-5 (indices 1-4): Green if auto won, Gray if not
     if (isAutoWon) {
-      return index % 2 == 0 ? Colors.green : Colors.grey;
+      return index % 2 == 0 ? activeColor : inactiveColor;
     } else {
-      return index % 2 == 1 ? Colors.green : Colors.grey;
+      return index % 2 == 1 ? activeColor : inactiveColor;
     }
   }
 
   Color _getBackgroundColor(int index, bool isAutoWon) {
     // Use a darker version of the segment color as background
-    if (index == 0) return Colors.yellow.withValues(alpha: 0.3);
-    if (index == 5) return Colors.pinkAccent.withValues(alpha: 0.3);
+    if (index == 0) return autonColor.withValues(alpha: 0.3);
+    if (index == 5) return endgameColor.withValues(alpha: 0.3);
     // Segments 2-5: green background if auto won, grey otherwise
     if (isAutoWon) {
       return index % 2 == 0
-          ? Colors.green.withValues(alpha: 0.3)
-          : Colors.grey.withValues(alpha: 0.3);
+          ? activeColor.withValues(alpha: 0.3)
+          : inactiveColor.withValues(alpha: 0.3);
     } else {
       return index % 2 == 1
-          ? Colors.green.withValues(alpha: 0.3)
-          : Colors.grey.withValues(alpha: 0.3);
+          ? activeColor.withValues(alpha: 0.3)
+          : inactiveColor.withValues(alpha: 0.3);
     }
   }
 
