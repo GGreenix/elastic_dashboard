@@ -78,44 +78,6 @@ class NinjasTimebarWidget extends NTWidget {
 
   const NinjasTimebarWidget({super.key});
 
-  // Segment definitions
-  static const List<int> _flexRatios = [20, 25, 25, 25, 25, 40];
-  static const List<int> _segmentStarts = [0, 20, 45, 70, 95, 120];
-  static const List<int> _segmentEnds = [20, 45, 70, 95, 120, 160];
-
-  Color _getSegmentColor(int index, bool isAutoWon) {
-    // Segment 1 (index 0): Yellow
-    if (index == 0) return Colors.yellow;
-    // Segment 6 (index 5): Magenta
-    if (index == 5) return Colors.pinkAccent;
-    // Segments 2-5 (indices 1-4): Green if auto won, Gray if not
-    return isAutoWon ? Colors.green : Colors.grey;
-  }
-
-  Color _getBackgroundColor(int index, bool isAutoWon) {
-    // Use a darker version of the segment color as background
-    if (index == 0) return Colors.yellow.withValues(alpha: 0.3);
-    if (index == 5) return Colors.pinkAccent.withValues(alpha: 0.3);
-    // Segments 2-5: green background if auto won, grey otherwise
-    return isAutoWon
-        ? Colors.green.withValues(alpha: 0.3)
-        : Colors.grey.withValues(alpha: 0.3);
-  }
-
-  double _calculateSegmentProgress(double totalValue, int segmentIndex) {
-    int start = _segmentStarts[segmentIndex];
-    int end = _segmentEnds[segmentIndex];
-    int segmentWidth = end - start;
-
-    if (totalValue <= start) {
-      return 0.0; // Segment is empty
-    } else if (totalValue >= end) {
-      return 1.0; // Segment is full
-    } else {
-      return (totalValue - start) / segmentWidth; // Partial fill
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     NinjasTimebarModel model = cast(context.watch<NTWidgetModel>());
@@ -129,56 +91,179 @@ class NinjasTimebarWidget extends NTWidget {
         return ValueListenableBuilder<Object?>(
           valueListenable: model.activeSubscription,
           builder: (context, activeData, child) {
-            // Cast the boolean properly - defaults to false if null
             bool isAutoWon = tryCast<bool>(activeData) ?? false;
 
-            return LayoutBuilder(
-              builder: (context, constraints) => Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: List.generate(6, (index) {
-                  double segmentProgress =
-                      _calculateSegmentProgress(totalValue, index);
-                  Color activeColor = _getSegmentColor(index, isAutoWon);
-                  Color backgroundColor = _getBackgroundColor(index, isAutoWon);
-
-                  return Expanded(
-                    flex: _flexRatios[index],
-                    child: Stack(
-                      alignment: Alignment.center,
-                      children: [
-                        // Progress bar
-                        Positioned.fill(
-                          child: LinearProgressIndicator(
-                            value: segmentProgress,
-                            backgroundColor: backgroundColor,
-                            valueColor:
-                                AlwaysStoppedAnimation<Color>(activeColor),
-                            minHeight: constraints.maxHeight,
-                          ),
-                        ),
-                        // Label for first segment (Autonomous)
-                        if (index == 0)
-                          const Center(
-                            child: Text(
-                              'Autonomous',
-                              style: TextStyle(
-                                color: Colors.black,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 12,
-                              ),
-                              textAlign: TextAlign.center,
-                            ),
-                          ),
-                      ],
-                    ),
-                  );
-                }),
-              ),
+            return _NinjasTimebarContent(
+              totalValue: totalValue,
+              isAutoWon: isAutoWon,
             );
           },
         );
       },
     );
   }
+}
+
+class _NinjasTimebarContent extends StatefulWidget {
+  final double totalValue;
+  final bool isAutoWon;
+
+  const _NinjasTimebarContent({
+    required this.totalValue,
+    required this.isAutoWon,
+  });
+
+  @override
+  State<_NinjasTimebarContent> createState() => _NinjasTimebarContentState();
+}
+
+class _NinjasTimebarContentState extends State<_NinjasTimebarContent>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _blinkController;
+
+  // Segment definitions
+  static const List<int> flexRatios = [20, 25, 25, 25, 25, 40];
+  static const List<int> segmentStarts = [0, 20, 45, 70, 95, 120];
+  static const List<int> segmentEnds = [20, 45, 70, 95, 120, 160];
+  static const double blinkThreshold = 3.0; // Start blinking 3 seconds before end
+  static const double endGameBlinkThreshold = 10.0; // Start blinking 3 seconds before end
+
+  @override
+  void initState() {
+    super.initState();
+    _blinkController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 50), // Blink speed
+    )..repeat(reverse: true);
+  }
+
+  @override
+  void dispose() {
+    _blinkController.dispose();
+    super.dispose();
+  }
+
+  bool _shouldBlink(int segmentIndex) {
+    int end = segmentEnds[segmentIndex];
+    int start = segmentStarts[segmentIndex];
+    
+    // Only blink if we're in this segment and within 3 units of the end
+    if (widget.totalValue >= start && widget.totalValue < end && segmentIndex != 5) {
+      return (end - widget.totalValue) <= blinkThreshold;
+    }
+    else if (widget.totalValue >= start && widget.totalValue < end) {
+      return (end - widget.totalValue) <= endGameBlinkThreshold;
+    }
+    
+    return false;
+  }
+
+  Color _getSegmentColor(int index, bool isAutoWon) {
+    // Segment 1 (index 0): Yellow
+    if (index == 0) return Colors.yellow;
+    // Segment 6 (index 5): Magenta
+    if (index == 5) return Colors.pinkAccent;
+    // Segments 2-5 (indices 1-4): Green if auto won, Gray if not
+    if (isAutoWon) {
+      return index % 2 == 0 ? Colors.green : Colors.grey;
+    } else {
+      return index % 2 == 1 ? Colors.green : Colors.grey;
+    }
+  }
+
+  Color _getBackgroundColor(int index, bool isAutoWon) {
+    // Use a darker version of the segment color as background
+    if (index == 0) return Colors.yellow.withValues(alpha: 0.3);
+    if (index == 5) return Colors.pinkAccent.withValues(alpha: 0.3);
+    // Segments 2-5: green background if auto won, grey otherwise
+    if (isAutoWon) {
+      return index % 2 == 0
+          ? Colors.green.withValues(alpha: 0.3)
+          : Colors.grey.withValues(alpha: 0.3);
+    } else {
+      return index % 2 == 1
+          ? Colors.green.withValues(alpha: 0.3)
+          : Colors.grey.withValues(alpha: 0.3);
+    }
+  }
+
+    Color _brightenColor(Color color, double amount) {
+    // Convert to HSL for better brightness control
+    final hsl = HSLColor.fromColor(color);
+    return hsl
+        .withLightness((hsl.lightness + amount * 0.5).clamp(0.0, 1.0))
+        .withSaturation((hsl.saturation + amount * 0.2).clamp(0.0, 1.0))
+        .toColor();
+  }
+
+
+  double _calculateSegmentProgress(double totalValue, int segmentIndex) {
+    int start = segmentStarts[segmentIndex];
+    int end = segmentEnds[segmentIndex];
+    int segmentWidth = end - start;
+
+    if (totalValue <= start) {
+      return 0.0;
+    } else if (totalValue >= end) {
+      return 1.0;
+    } else {
+      return (totalValue - start) / segmentWidth;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => AnimatedBuilder(
+      animation: _blinkController,
+      builder: (context, child) => LayoutBuilder(
+          builder: (context, constraints) => Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: List.generate(6, (index) {
+              double segmentProgress =
+                  _calculateSegmentProgress(widget.totalValue, index);
+              
+              Color baseColor = _getSegmentColor(index, widget.isAutoWon);
+              Color backgroundColor = _getBackgroundColor(index, widget.isAutoWon);
+              
+              // Apply blinking effect if within threshold
+              Color activeColor;
+              if (_shouldBlink(index)) {
+                // Brighten based on animation value (0.0 to 1.0)
+                activeColor = _brightenColor(baseColor, _blinkController.value * 0.5);
+              } else {
+                activeColor = baseColor;
+              }
+              
+              return Expanded(
+                flex: flexRatios[index],
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    Positioned.fill(
+                      child: LinearProgressIndicator(
+                        value: segmentProgress,
+                        backgroundColor: backgroundColor,
+                        valueColor: AlwaysStoppedAnimation<Color>(activeColor),
+                        minHeight: constraints.maxHeight,
+                      ),
+                    ),
+                    if (index == 0)
+                      const Center(
+                        child: Text(
+                          'Autonomous',
+                          style: TextStyle(
+                            color: Colors.black,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 12,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                  ],
+                ),
+              );
+            }),
+          ),
+        ),
+    );
 }
