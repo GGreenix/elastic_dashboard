@@ -86,7 +86,7 @@ class NinjasTimebarWidget extends NTWidget {
       valueListenable: model.timeSubscription,
       builder: (context, timeData, child) {
         double totalValue =
-            -(tryCast<num>(timeData)?.toDouble() ?? 0.0).clamp(0.0, 160.0) + 160;
+            (tryCast<num>(timeData)?.toDouble() ?? 0.0).clamp(0.0, 160.0);
 
         return ValueListenableBuilder<Object?>(
           valueListenable: model.activeSubscription,
@@ -125,19 +125,28 @@ class _NinjasTimebarContentState extends State<_NinjasTimebarContent>
   static const List<int> flexRatios = [20, 25, 25, 25, 25, 40];
   static const List<int> segmentStarts = [0, 20, 45, 70, 95, 120];
   static const List<int> segmentEnds = [20, 45, 70, 95, 120, 160];
-  static const double blinkThreshold = 3.0; // Start blinking 3 seconds before end
+  static const List<String> segmentLabels = [
+    'Auto',
+    'Seg 2',
+    'Seg 3',
+    'Seg 4',
+    'Seg 5',
+    'Endgame',
+  ];
+  static const double blinkThreshold = 3.0;
   static const double endGameBlinkThreshold = 10.0; // Start blinking 3 seconds before end
   static const Color autonColor = Colors.yellow;
   static const Color endgameColor = Colors.pinkAccent;
   static const Color activeColor = Colors.green;
   static const Color inactiveColor = Colors.grey;
 
+
   @override
   void initState() {
     super.initState();
     _blinkController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 50), // Blink speed
+      duration: const Duration(milliseconds: 100),
     )..repeat(reverse: true);
   }
 
@@ -145,6 +154,15 @@ class _NinjasTimebarContentState extends State<_NinjasTimebarContent>
   void dispose() {
     _blinkController.dispose();
     super.dispose();
+  }
+
+  int _getCurrentSegmentIndex() {
+    for (int i = 0; i < segmentEnds.length; i++) {
+      if (widget.totalValue < segmentEnds[i]) {
+        return i;
+      }
+    }
+    return segmentEnds.length - 1; // Return last segment if at/past end
   }
 
   bool _shouldBlink(int segmentIndex) {
@@ -190,16 +208,18 @@ class _NinjasTimebarContentState extends State<_NinjasTimebarContent>
           : inactiveColor.withValues(alpha: 0.3);
     }
   }
-
-    Color _brightenColor(Color color, double amount) {
-    // Convert to HSL for better brightness control
-    final hsl = HSLColor.fromColor(color);
-    return hsl
-        .withLightness((hsl.lightness + amount * 0.5).clamp(0.0, 1.0))
-        .withSaturation((hsl.saturation + amount * 0.2).clamp(0.0, 1.0))
-        .toColor();
+  double _getTimeRemainingInSegment(int segmentIndex) {
+    if (segmentIndex < 0 || segmentIndex >= segmentEnds.length) return 0;
+    return (segmentEnds[segmentIndex] - widget.totalValue).clamp(0.0, double.infinity);
   }
 
+
+  Color _brightenColor(Color color, double amount) {
+    int r = (color.red + (255 - color.red) * amount * 0.6).round().clamp(0, 255);
+    int g = (color.green + (255 - color.green) * amount * 0.6).round().clamp(0, 255);
+    int b = (color.blue + (255 - color.blue) * amount * 0.6).round().clamp(0, 255);
+    return Color.fromARGB(color.alpha, r, g, b);
+  }
 
   double _calculateSegmentProgress(double totalValue, int segmentIndex) {
     int start = segmentStarts[segmentIndex];
@@ -215,48 +235,124 @@ class _NinjasTimebarContentState extends State<_NinjasTimebarContent>
     }
   }
 
+  String _formatTime(double seconds) {
+    int secs = seconds.ceil();
+    if (secs >= 60) {
+      int mins = secs ~/ 60;
+      int remainingSecs = secs % 60;
+      return '$mins:${remainingSecs.toString().padLeft(2, '0')}';
+    }
+    return '${secs}s';
+  }
+
   @override
-  Widget build(BuildContext context) => AnimatedBuilder(
+  Widget build(BuildContext context) {
+    int currentSegment = _getCurrentSegmentIndex();
+    double timeRemaining = _getTimeRemainingInSegment(currentSegment);
+    String currentLabel = segmentLabels[currentSegment];
+
+    return AnimatedBuilder(
       animation: _blinkController,
-      builder: (context, child) => LayoutBuilder(
-          builder: (context, constraints) => Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: List.generate(6, (index) {
-              double segmentProgress =
-                  _calculateSegmentProgress(widget.totalValue, index);
-              
-              Color baseColor = _getSegmentColor(index, widget.isAutoWon);
-              Color backgroundColor = _getBackgroundColor(index, widget.isAutoWon);
-              
-              // Apply blinking effect if within threshold
-              Color activeColor;
-              if (_shouldBlink(index)) {
-                // Brighten based on animation value (0.0 to 1.0)
-                activeColor = _brightenColor(baseColor, _blinkController.value * 0.5);
-              } else {
-                activeColor = baseColor;
-              }
-              
-              return Expanded(
-                flex: flexRatios[index],
-                child: Stack(
-                  alignment: Alignment.center,
+      builder: (context, child) => Column(
+          children: [
+            // Progress bar row
+            Expanded(
+              flex: 3,
+              child: LayoutBuilder(
+                builder: (context, constraints) => Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: List.generate(6, (index) {
+                    double segmentProgress =
+                        _calculateSegmentProgress(widget.totalValue, index);
+
+                    Color baseColor = _getSegmentColor(index, widget.isAutoWon);
+                    Color backgroundColor =
+                        _getBackgroundColor(index, widget.isAutoWon);
+
+                    Color activeColor;
+                    if (_shouldBlink(index)) {
+                      activeColor =
+                          _brightenColor(baseColor, _blinkController.value);
+                    } else {
+                      activeColor = baseColor;
+                    }
+
+                    return Expanded(
+                      flex: flexRatios[index],
+                      child: Stack(
+                        alignment: Alignment.center,
+                        children: [
+                          Positioned.fill(
+                            child: LinearProgressIndicator(
+                              value: segmentProgress,
+                              backgroundColor: backgroundColor,
+                              valueColor:
+                                  AlwaysStoppedAnimation<Color>(activeColor),
+                              minHeight: constraints.maxHeight,
+                            ),
+                          ),
+                          if (index == 0)
+                            const Center(
+                              child: Text(
+                                'Autonomous',
+                                style: TextStyle(
+                                  color: Colors.black,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 12,
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                            ),
+                        ],
+                      ),
+                    );
+                  }),
+                ),
+              ),
+            ),
+            // Timer display row
+            Expanded(
+              flex: 1,
+              child: Container(
+                color: Colors.black54,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Positioned.fill(
-                      child: LinearProgressIndicator(
-                        value: segmentProgress,
-                        backgroundColor: backgroundColor,
-                        valueColor: AlwaysStoppedAnimation<Color>(activeColor),
-                        minHeight: constraints.maxHeight,
+                    Text(
+                      '$currentLabel: ',
+                      style: const TextStyle(
+                        color: Colors.white70,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
                       ),
                     ),
-                    
+                    Text(
+                      _formatTime(timeRemaining),
+                      style: TextStyle(
+                        color: timeRemaining <= blinkThreshold
+                            ? (_blinkController.value > 0.5
+                                ? Colors.red
+                                : Colors.white)
+                            : Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Text(
+                      'Total: ${_formatTime((160 - widget.totalValue).clamp(0, 160))}',
+                      style: const TextStyle(
+                        color: Colors.white54,
+                        fontSize: 12,
+                      ),
+                    ),
                   ],
                 ),
-              );
-            }),
-          ),
+              ),
+            ),
+          ],
         ),
     );
+  }
 }
