@@ -22,7 +22,7 @@ import 'package:elastic_dashboard/widgets/nt_widgets/single_topic/text_display.d
 import 'package:elastic_dashboard/widgets/nt_widgets/single_topic/toggle_button.dart';
 import 'package:elastic_dashboard/widgets/nt_widgets/single_topic/toggle_switch.dart';
 import 'package:elastic_dashboard/widgets/nt_widgets/single_topic/voltage_view.dart';
-
+import 'package:elastic_dashboard/widgets/nt_widgets/single_topic/ninjas_timebar.dart';
 sealed class NTWidgetModel extends ChangeNotifier {
   String get type;
 
@@ -199,6 +199,7 @@ class SingleTopicNTWidgetModel extends NTWidgetModel {
         RadialGaugeWidget.widgetType,
         GraphWidget.widgetType,
         MatchTimeWidget.widgetType,
+        NinjasTimebarWidget.widgetType,
       ]);
     }
 
@@ -357,7 +358,11 @@ class MultiTopicNTWidgetModel extends NTWidgetModel {
         type == SplitButtonChooser.widgetType) {
       return [ComboBoxChooser.widgetType, SplitButtonChooser.widgetType];
     }
-
+    
+    else if(type == NinjasTimebarWidget.widgetType) {
+      return [NinjasTimebarWidget.widgetType];
+    }
+    print(type);
     return [type];
   }
 

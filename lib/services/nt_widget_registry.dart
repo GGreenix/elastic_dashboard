@@ -46,6 +46,7 @@ import 'package:elastic_dashboard/widgets/nt_widgets/single_topic/text_display.d
 import 'package:elastic_dashboard/widgets/nt_widgets/single_topic/toggle_button.dart';
 import 'package:elastic_dashboard/widgets/nt_widgets/single_topic/toggle_switch.dart';
 import 'package:elastic_dashboard/widgets/nt_widgets/single_topic/voltage_view.dart';
+import 'package:elastic_dashboard/widgets/nt_widgets/single_topic/ninjas_timebar.dart';
 
 typedef NTModelJsonProvider<T extends NTWidgetModel> =
     T Function({
@@ -98,6 +99,13 @@ class NTWidgetRegistry {
     }
 
     logger.info('Configuring NT Widget Builder');
+
+    registerMultiTopic(
+      name: NinjasTimebarWidget.widgetType,
+      model: NinjasTimebarModel.new,
+      widget: NinjasTimebarWidget.new,
+      fromJson: NinjasTimebarModel.fromJson,
+    );
 
     registerSingleTopic(
       name: BooleanBox.widgetType,
