@@ -1,7 +1,10 @@
 import 'package:elastic_dashboard/services/nt4_client.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:dot_cast/dot_cast.dart';
 import 'package:provider/provider.dart';
+import 'package:elastic_dashboard/widgets/dialog_widgets/dialog_color_picker.dart';
+import 'package:elastic_dashboard/widgets/dialog_widgets/dialog_text_input.dart';
 import 'package:elastic_dashboard/widgets/nt_widgets/nt_widget.dart';
 
 class NinjasTimebarModel extends MultiTopicNTWidgetModel {
@@ -10,6 +13,11 @@ class NinjasTimebarModel extends MultiTopicNTWidgetModel {
 
   double _startingTime = 0;
   double _endingTime = 160; // FRC 2026: 20 + 10 + 100 + 30 = 160s
+
+  double _activeShiftFlashTime = 3.0;
+  double _inactiveShiftFlashTime = 3.0;
+  double _endgameFlashTime = 10.0;
+  Color _transitionColor = Colors.orange;
 
   String get activeTopicName => '$topic/active';
   String get timeTopicName => '$topic/time';
@@ -37,6 +45,34 @@ class NinjasTimebarModel extends MultiTopicNTWidgetModel {
     refresh();
   }
 
+  double get activeShiftFlashTime => _activeShiftFlashTime;
+
+  set activeShiftFlashTime(double value) {
+    _activeShiftFlashTime = value;
+    refresh();
+  }
+
+  double get inactiveShiftFlashTime => _inactiveShiftFlashTime;
+
+  set inactiveShiftFlashTime(double value) {
+    _inactiveShiftFlashTime = value;
+    refresh();
+  }
+
+  double get endgameFlashTime => _endgameFlashTime;
+
+  set endgameFlashTime(double value) {
+    _endgameFlashTime = value;
+    refresh();
+  }
+
+  Color get transitionColor => _transitionColor;
+
+  set transitionColor(Color value) {
+    _transitionColor = value;
+    refresh();
+  }
+
   NinjasTimebarModel({
     required super.ntConnection,
     required super.preferences,
@@ -44,8 +80,16 @@ class NinjasTimebarModel extends MultiTopicNTWidgetModel {
     super.period,
     double startingTime = 0,
     double endingTime = 160,
+    double activeShiftFlashTime = 3.0,
+    double inactiveShiftFlashTime = 3.0,
+    double endgameFlashTime = 10.0,
+    Color transitionColor = Colors.orange,
   })  : _startingTime = startingTime,
         _endingTime = endingTime,
+        _activeShiftFlashTime = activeShiftFlashTime,
+        _inactiveShiftFlashTime = inactiveShiftFlashTime,
+        _endgameFlashTime = endgameFlashTime,
+        _transitionColor = transitionColor,
         super();
 
   NinjasTimebarModel.fromJson({
@@ -55,6 +99,14 @@ class NinjasTimebarModel extends MultiTopicNTWidgetModel {
   }) : super.fromJson(jsonData: jsonData) {
     _startingTime = tryCast(jsonData['start_angle']) ?? _startingTime;
     _endingTime = tryCast(jsonData['end_angle']) ?? 160;
+    _activeShiftFlashTime =
+        tryCast<num>(jsonData['active_shift_flash_time'])?.toDouble() ?? 3.0;
+    _inactiveShiftFlashTime =
+        tryCast<num>(jsonData['inactive_shift_flash_time'])?.toDouble() ?? 3.0;
+    _endgameFlashTime =
+        tryCast<num>(jsonData['endgame_flash_time'])?.toDouble() ?? 10.0;
+    int? transColorValue = tryCast(jsonData['transition_color']);
+    _transitionColor = Color(transColorValue ?? Colors.orange.toARGB32());
   }
 
   @override
@@ -68,7 +120,88 @@ class NinjasTimebarModel extends MultiTopicNTWidgetModel {
         ...super.toJson(),
         'start_angle': _startingTime,
         'end_angle': _endingTime,
+        'active_shift_flash_time': _activeShiftFlashTime,
+        'inactive_shift_flash_time': _inactiveShiftFlashTime,
+        'endgame_flash_time': _endgameFlashTime,
+        'transition_color': _transitionColor.toARGB32(),
       };
+
+  @override
+  List<Widget> getEditProperties(BuildContext context) => [
+        Row(
+          children: [
+            Flexible(
+              child: Tooltip(
+                message:
+                    'Seconds before end of an active shift to start flashing',
+                waitDuration: const Duration(milliseconds: 750),
+                child: DialogTextInput(
+                  label: 'Active Shift Flash Time',
+                  initialText: _activeShiftFlashTime.toStringAsFixed(1),
+                  onSubmit: (value) {
+                    double? parsed = double.tryParse(value);
+                    if (parsed == null) return;
+                    activeShiftFlashTime = parsed;
+                  },
+                  formatter: FilteringTextInputFormatter.allow(
+                      RegExp(r'[\d.]')),
+                ),
+              ),
+            ),
+            Flexible(
+              child: Tooltip(
+                message:
+                    'Seconds before end of an inactive shift to start flashing',
+                waitDuration: const Duration(milliseconds: 750),
+                child: DialogTextInput(
+                  label: 'Inactive Shift Flash Time',
+                  initialText: _inactiveShiftFlashTime.toStringAsFixed(1),
+                  onSubmit: (value) {
+                    double? parsed = double.tryParse(value);
+                    if (parsed == null) return;
+                    inactiveShiftFlashTime = parsed;
+                  },
+                  formatter: FilteringTextInputFormatter.allow(
+                      RegExp(r'[\d.]')),
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 5),
+        Row(
+          children: [
+            Flexible(
+              child: Tooltip(
+                message:
+                    'Seconds before end of endgame to start flashing',
+                waitDuration: const Duration(milliseconds: 750),
+                child: DialogTextInput(
+                  label: 'Endgame Flash Time',
+                  initialText: _endgameFlashTime.toStringAsFixed(1),
+                  onSubmit: (value) {
+                    double? parsed = double.tryParse(value);
+                    if (parsed == null) return;
+                    endgameFlashTime = parsed;
+                  },
+                  formatter: FilteringTextInputFormatter.allow(
+                      RegExp(r'[\d.]')),
+                ),
+              ),
+            ),
+            Flexible(
+              child: DialogColorPicker(
+                onColorPicked: (Color color) {
+                  transitionColor = color;
+                },
+                label: 'Transition Color',
+                initialColor: _transitionColor,
+                defaultColor: Colors.orange,
+              ),
+            ),
+          ],
+        ),
+      ];
 }
 
 class NinjasTimebarWidget extends NTWidget {
@@ -95,6 +228,10 @@ class NinjasTimebarWidget extends NTWidget {
             return _NinjasTimebarContent(
               totalValue: totalValue,
               isAutoWon: isAutoWon,
+              activeShiftFlashTime: model.activeShiftFlashTime,
+              inactiveShiftFlashTime: model.inactiveShiftFlashTime,
+              endgameFlashTime: model.endgameFlashTime,
+              transitionColor: model.transitionColor,
             );
           },
         );
@@ -106,10 +243,18 @@ class NinjasTimebarWidget extends NTWidget {
 class _NinjasTimebarContent extends StatefulWidget {
   final double totalValue;
   final bool isAutoWon;
+  final double activeShiftFlashTime;
+  final double inactiveShiftFlashTime;
+  final double endgameFlashTime;
+  final Color transitionColor;
 
   const _NinjasTimebarContent({
     required this.totalValue,
     required this.isAutoWon,
+    required this.activeShiftFlashTime,
+    required this.inactiveShiftFlashTime,
+    required this.endgameFlashTime,
+    required this.transitionColor,
   });
 
   @override
@@ -133,9 +278,6 @@ class _NinjasTimebarContentState extends State<_NinjasTimebarContent>
     'Shift 4',
     'Endgame',
   ];
-
-  static const double blinkThreshold = 3.0;
-  static const double endGameBlinkThreshold = 10.0; 
 
   static const Color autonColor = Colors.yellow;
   static const Color endgameColor = Colors.pinkAccent;
@@ -167,9 +309,22 @@ class _NinjasTimebarContentState extends State<_NinjasTimebarContent>
   bool _shouldBlink(int segmentIndex) {
     int end = segmentEnds[segmentIndex];
     int start = segmentStarts[segmentIndex];
-    
+
     if (widget.totalValue >= start && widget.totalValue < end) {
-      double threshold = (segmentIndex == 6) ? endGameBlinkThreshold : blinkThreshold;
+      double threshold;
+      if (segmentIndex == 6) {
+        threshold = widget.endgameFlashTime;
+      } else if (segmentIndex == 0 || segmentIndex == 1) {
+        // Auto and transition don't use shift flash times
+        threshold = widget.activeShiftFlashTime;
+      } else {
+        bool isShiftActive = widget.isAutoWon
+            ? (segmentIndex % 2 == 1)
+            : (segmentIndex % 2 == 0);
+        threshold = isShiftActive
+            ? widget.activeShiftFlashTime
+            : widget.inactiveShiftFlashTime;
+      }
       return (end - widget.totalValue) <= threshold;
     }
     return false;
@@ -177,7 +332,7 @@ class _NinjasTimebarContentState extends State<_NinjasTimebarContent>
 
   Color _getSegmentColor(int index, bool isAutoWon) {
     if (index == 0) return autonColor;
-    if (index == 1) return Colors.blueGrey; // Transition period
+    if (index == 1) return widget.transitionColor; // Transition period
     if (index == 6) return endgameColor;
 
     // Shift logic: Winner of Auto gets active HUB in Shifts 2 & 4 (indices 3 & 5)
